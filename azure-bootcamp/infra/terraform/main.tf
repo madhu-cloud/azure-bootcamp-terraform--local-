@@ -10,12 +10,13 @@ terraform {
 }
 
 provider "azurerm" {
-  features = {}
+  features {}
 }
 
 # Root variables
 variable "resource_group" {
-  type = string
+  type        = string
+  description = "Name of the resource group"
 }
 
 variable "location" {
@@ -44,28 +45,36 @@ variable "postgres_admin_password" {
   sensitive = true
 }
 
-# Module calls (use resource_group everywhere to match module variable names)
+# Module calls
+# - network expects `resource_group_name`
+# - aks expects `resource_group`
+# - postgres expects `resource_group`
+
 module "network" {
-  source         = "./modules/network"
-  resource_group = var.resource_group
-  location       = var.location
-  vnet_name      = var.vnet_name
-  address_space  = var.vnet_address_space
+  source              = "./modules/network"
+  resource_group_name = var.resource_group
+  location            = var.location
+  vnet_name           = var.vnet_name
+  address_space       = var.vnet_address_space
 }
 
 module "aks" {
   source         = "./modules/aks"
   aks_name       = var.aks_name
-  resource_group = var.resource_group
+  resource_group = var.resource_group      # aks expects `resource_group`
   location       = var.location
-  vnet_subnet_id = module.network.aks_subnet_id
+
+  # network module exports subnet_id (single subnet)
+  vnet_subnet_id = module.network.subnet_id
 }
 
 module "postgres" {
   source         = "./modules/postgres"
   name           = var.postgres_name
-  resource_group = var.resource_group
+  resource_group = var.resource_group      # postgres expects `resource_group`
   location       = var.location
   admin_password = var.postgres_admin_password
-  subnet_id      = module.network.db_subnet_id
+
+  # network module exports subnet_id (single subnet)
+  subnet_id = module.network.subnet_id
 }
